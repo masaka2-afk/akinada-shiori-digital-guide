@@ -41,3 +41,6 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+/pages-dist/
+/github-pages/public/runtime-config.js
+/github-pages/public/data/places.json

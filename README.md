@@ -1,98 +1,53 @@
-# vinext-starter
+# 安芸灘しおり Digital Guide β
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+「旅のしおりは、しおりちゃんにおまかせ♪」
 
-## Prerequisites
+Googleマイマップを管理用の原本として使い続けながら、スマホで見やすい公開用観光Webアプリを提供するプロジェクトです。
 
-- Node.js `>=22.13.0`
+## β版
 
-## Quick Start
+- 公開URL: https://masaka2-afk.github.io/akinada-shiori-digital-guide-beta/
+- 管理用Googleマイマップ: https://www.google.com/maps/d/viewer?mid=1TbtYyvz6fS9qpn43ZbrWi6NnRYDaVXs
+
+## 公開の仕組み
+
+`main`ブランチへ反映すると、GitHub Actionsが次の処理を自動実行します。
+
+1. 公開中のGoogleマイマップからKMLを取得
+2. アプリ用JSONへ変換（失敗時は前回キャッシュを使用）
+3. Google Maps API設定をGitHub Secretsから読み込み
+4. GitHub Pages用アプリをビルド
+5. GitHub Pagesへ公開
+
+毎日05:17（日本時間）の自動同期と、Actions画面からの手動実行にも対応しています。
+
+## 開発コマンド
 
 ```bash
-npm install
-npm run dev
-npm run build
+pnpm install
+pnpm dev
+pnpm build
 ```
 
-This starter does not use `wrangler.jsonc`.
+GitHub Pages版をローカルで作る場合:
 
-## Included Shape
-
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
-
-## Workspace Auth Headers
-
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```bash
+pnpm sync:pages
+pnpm config:pages
+pnpm build:pages
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+## 環境変数
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+ローカルでは`.env`を使用します。`.env`はGit管理対象外です。
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
+```env
+GOOGLE_MAPS_API_KEY=your_google_maps_javascript_api_key
+GOOGLE_MAPS_MAP_ID=optional_google_maps_javascript_map_id
+```
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
+GitHubでは`GOOGLE_MAPS_API_KEY`をRepository Secretとして保存します。Google Maps JavaScript APIのブラウザーキーは配信後の通信から確認できるため、Google Cloud Consoleで次のHTTPリファラー制限を必ず設定してください。
 
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
-
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
-
-## Useful Commands
-
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
-
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+```text
+https://masaka2-afk.github.io/akinada-shiori-digital-guide-beta/*
+```

@@ -30,7 +30,22 @@ declare global {
   interface Window {
     google?: any;
     __akinadaMapReady?: () => void;
+    __AKINADA_STATIC_CONFIG__?: {
+      apiKey?: string;
+      mapId?: string;
+      basePath?: string;
+      placesUrl?: string;
+    };
   }
+}
+
+function staticConfig() {
+  return typeof window === "undefined" ? undefined : window.__AKINADA_STATIC_CONFIG__;
+}
+
+function assetPath(path: string) {
+  const basePath = staticConfig()?.basePath?.replace(/\/$/, "") ?? "";
+  return `${basePath}/${path.replace(/^\//, "")}`;
 }
 
 const categories: { name: Category; icon: string }[] = [
@@ -126,12 +141,12 @@ const markerTone: Record<Exclude<Category, "すべて">, string> = {
 };
 
 const markerAsset: Record<Exclude<Category, "すべて">, string> = {
-  絶景: "/marker-blue.png",
-  歴史: "/marker-red.png",
-  神社: "/marker-red.png",
-  グルメ: "/marker-green.png",
-  公園: "/marker-green.png",
-  美術館: "/marker-blue.png",
+  絶景: assetPath("marker-blue.png"),
+  歴史: assetPath("marker-red.png"),
+  神社: assetPath("marker-red.png"),
+  グルメ: assetPath("marker-green.png"),
+  公園: assetPath("marker-green.png"),
+  美術館: assetPath("marker-blue.png"),
 };
 
 const myMapsInspiredStyle = [
@@ -221,7 +236,12 @@ export default function Home() {
   const loadPlaces = async (manual = false) => {
     setSyncing(true);
     try {
-      const response = await fetch("/api/places", { method: manual ? "POST" : "GET", cache: "no-store" });
+      const config = staticConfig();
+      const placesUrl = config?.placesUrl ?? "/api/places";
+      const requestUrl = manual && config
+        ? `${placesUrl}${placesUrl.includes("?") ? "&" : "?"}refresh=${Date.now()}`
+        : placesUrl;
+      const response = await fetch(requestUrl, { method: config ? "GET" : manual ? "POST" : "GET", cache: "no-store" });
       const data = await response.json() as { places?: Place[] } & SyncMeta;
       if (!response.ok || !data.places?.length) throw new Error(data.syncError || "同期に失敗しました");
       setPlaces(data.places);
@@ -246,6 +266,16 @@ export default function Home() {
   useEffect(() => { void loadPlaces(false); }, []);
 
   useEffect(() => {
+    const config = staticConfig();
+    if (config) {
+      if (config.apiKey) {
+        setMapsMapId(config.mapId ?? "");
+        setMapsApiKey(config.apiKey);
+      } else {
+        setMapStatus("missing");
+      }
+      return;
+    }
     fetch("/api/maps-config", { cache: "no-store" })
       .then((response) => response.json())
       .then((config: { apiKey?: string; mapId?: string; configured?: boolean }) => {
@@ -327,7 +357,7 @@ export default function Home() {
             title: `${count}スポット`,
             zIndex: 1000 + count,
             icon: {
-              url: "/marker-blue.png",
+              url: assetPath("marker-blue.png"),
               scaledSize: new window.google.maps.Size(68, 68),
               anchor: new window.google.maps.Point(34, 34),
             },
@@ -445,7 +475,7 @@ export default function Home() {
     <main className="app-shell">
       <header className="topbar">
         <div className="brand-lockup">
-          <img src="/akinada-logo.png" alt="安芸灘しおり" className="brand-logo" />
+          <img src={assetPath("akinada-logo.png")} alt="安芸灘しおり" className="brand-logo" />
           <div>
             <p className="eyebrow">AKINADA SHIORI</p>
             <h1>Digital Guide</h1>
@@ -539,7 +569,7 @@ export default function Home() {
 
         <aside className="detail-card" aria-live="polite">
           <div className="detail-photo">
-            <img src={selected.image || "/shiori-guide.png"} alt={selected.name} />
+            <img src={selected.image || assetPath("shiori-guide.png")} alt={selected.name} />
             <span className={`category-badge ${markerTone[selected.category]}`}>{selected.category}</span>
             <div className="photo-wash" />
           </div>
@@ -552,7 +582,7 @@ export default function Home() {
               {selected.youtube && <a className="video-action" href={selected.youtube} target="_blank" rel="noreferrer"><span>▶</span>動画を見る</a>}
             </div>
             <div className="mini-guide">
-              <img src="/shiori-icon.png" alt="しおりちゃん" />
+              <img src={assetPath("shiori-icon.png")} alt="しおりちゃん" />
               <p><strong>しおりちゃんメモ</strong><br /><span key={`${selected.id}-${memoText}`}>{memoText}</span></p>
             </div>
           </div>
@@ -576,7 +606,7 @@ export default function Home() {
       </section>
 
       <footer>
-        <img src="/shiori-guide.png" alt="案内する安芸灘しおり" />
+        <img src={assetPath("shiori-guide.png")} alt="案内する安芸灘しおり" />
         <p><strong>瀬戸内から、あなたの旅にやさしい風を。</strong><br />Googleマイマップを管理元にした、安芸灘しおり公式デジタルガイド</p>
         <div className="sync-panel">
           <p className="sync-meta">
