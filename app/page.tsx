@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkerClusterer } from "@googlemaps/markerclusterer";
+import shioriMemos from "../data/shiori-memos.json";
 
 type Category = "すべて" | "絶景" | "歴史" | "神社" | "グルメ" | "公園" | "美術館";
 
@@ -160,7 +161,25 @@ const myMapsInspiredStyle = [
 
 type MapStatus = "loading" | "missing" | "ready" | "error";
 
-const SHIORI_CALCULATOR_URL = "https://masaka2-afk.github.io/chibi-shiori-calculator/";
+type MiniAppId = "calculator" | "marble-catch";
+
+const miniApps: { id: MiniAppId; name: string; description: string; icon: string; url: string }[] = [
+  { id: "calculator", name: "しおり電卓", description: "旅費やお買い物の計算に", icon: "▦", url: "https://masaka2-afk.github.io/chibi-shiori-calculator/" },
+  { id: "marble-catch", name: "しおりのビー玉キャッチ", description: "ビー玉を集めて遊ぼう", icon: "●", url: "https://akinada-shiori-game.netlify.app" },
+];
+
+function memoGroup(category: Place["category"]) {
+  if (category === "歴史" || category === "神社") return "歴史・神社" as const;
+  return category;
+}
+
+function pickMemo(category: Place["category"], previous = "") {
+  const specific = shioriMemos.categories[memoGroup(category)] ?? [];
+  const candidates = [...shioriMemos.common, ...specific];
+  const available = candidates.filter((message) => message !== previous);
+  const pool = available.length ? available : candidates;
+  return pool[Math.floor(Math.random() * pool.length)] ?? shioriMemos.common[0];
+}
 
 export default function Home() {
   const [places, setPlaces] = useState<Place[]>(fallbackPlaces);
@@ -173,15 +192,17 @@ export default function Home() {
   const [mapsMapId, setMapsMapId] = useState("");
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
   const [appsMenuOpen, setAppsMenuOpen] = useState(false);
-  const [calculatorOpen, setCalculatorOpen] = useState(false);
-  const [calculatorLoaded, setCalculatorLoaded] = useState(false);
-  const [calculatorSlow, setCalculatorSlow] = useState(false);
+  const [activeAppId, setActiveAppId] = useState<MiniAppId | null>(null);
+  const [appLoaded, setAppLoaded] = useState(false);
+  const [appSlow, setAppSlow] = useState(false);
+  const [memoText, setMemoText] = useState(() => pickMemo(fallbackPlaces[0].category));
   const [syncMeta, setSyncMeta] = useState<SyncMeta>({});
   const [syncing, setSyncing] = useState(false);
   const mapNode = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markerRefs = useRef<any[]>([]);
   const clusterRef = useRef<MarkerClusterer | null>(null);
+  const activeApp = miniApps.find((app) => app.id === activeAppId) ?? null;
 
   const loadPlaces = async (manual = false) => {
     setSyncing(true);
@@ -233,6 +254,19 @@ export default function Home() {
     });
   }, [places, category, query]);
 
+  const selectPlace = (place: Place, moveMap = true) => {
+    setSelected(place);
+    setMemoText((previous) => pickMemo(place.category, previous));
+    if (moveMap) {
+      mapRef.current?.panTo({ lat: place.lat, lng: place.lng });
+      mapRef.current?.setZoom(15);
+    }
+  };
+
+  useEffect(() => {
+    setMemoText((previous) => pickMemo(selected.category, previous));
+  }, [selected.id, selected.category]);
+
   useEffect(() => {
     if (!mapsApiKey || !mapNode.current) return;
 
@@ -267,7 +301,7 @@ export default function Home() {
         });
         marker.__placeId = place.id;
         marker.__category = place.category;
-        marker.addListener("click", () => setSelected(place));
+        marker.addListener("click", () => selectPlace(place, false));
         return marker;
       });
       clusterRef.current = new MarkerClusterer({
@@ -329,20 +363,20 @@ export default function Home() {
     });
   }, [selected.id]);
 
-  const openCalculator = () => {
+  const openMiniApp = (appId: MiniAppId) => {
     setAppsMenuOpen(false);
-    setCalculatorLoaded(false);
-    setCalculatorSlow(false);
-    setCalculatorOpen(true);
+    setAppLoaded(false);
+    setAppSlow(false);
+    setActiveAppId(appId);
   };
 
   useEffect(() => {
-    if (!calculatorOpen) return;
+    if (!activeAppId) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const slowTimer = window.setTimeout(() => setCalculatorSlow(true), 6000);
+    const slowTimer = window.setTimeout(() => setAppSlow(true), 6000);
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setCalculatorOpen(false);
+      if (event.key === "Escape") setActiveAppId(null);
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => {
@@ -350,13 +384,7 @@ export default function Home() {
       window.removeEventListener("keydown", closeOnEscape);
       document.body.style.overflow = previousOverflow;
     };
-  }, [calculatorOpen]);
-
-  const choosePlace = (place: Place) => {
-    setSelected(place);
-    mapRef.current?.panTo({ lat: place.lat, lng: place.lng });
-    mapRef.current?.setZoom(15);
-  };
+  }, [activeAppId]);
 
   const locateMe = () => {
     if (!navigator.geolocation) {
@@ -420,11 +448,13 @@ export default function Home() {
           {appsMenuOpen && (
             <div className="apps-menu" role="menu" aria-label="しおりアプリ">
               <p><strong>しおりアプリ</strong><small>旅に便利なミニアプリ</small></p>
-              <button role="menuitem" onClick={openCalculator}>
-                <span className="app-icon" aria-hidden="true">▦</span>
-                <span><strong>しおり電卓</strong><small>旅費やお買い物の計算に</small></span>
-                <span aria-hidden="true">›</span>
-              </button>
+              {miniApps.map((app) => (
+                <button key={app.id} role="menuitem" onClick={() => openMiniApp(app.id)}>
+                  <span className={`app-icon ${app.id}`} aria-hidden="true">{app.icon}</span>
+                  <span><strong>{app.name}</strong><small>{app.description}</small></span>
+                  <span aria-hidden="true">›</span>
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -473,7 +503,7 @@ export default function Home() {
                     left: `${16 + ((place.lng - 132.66) / 0.085) * 68}%`,
                     top: `${10 + (1 - (place.lat - 34.155) / 0.07) * 76}%`,
                   }}
-                  onClick={() => choosePlace(place)}
+                  onClick={() => selectPlace(place)}
                   aria-label={place.name}
                   title={place.name}
                 >
@@ -509,7 +539,7 @@ export default function Home() {
             </div>
             <div className="mini-guide">
               <img src="/shiori-icon.png" alt="しおりちゃん" />
-              <p><strong>しおりちゃんメモ</strong><br />島の道はゆっくり走ってね。気になる景色を見つけたら、ちょっと寄り道もおすすめ♪</p>
+              <p><strong>しおりちゃんメモ</strong><br /><span key={`${selected.id}-${memoText}`}>{memoText}</span></p>
             </div>
           </div>
         </aside>
@@ -522,7 +552,7 @@ export default function Home() {
         </div>
         <div className="spot-cards">
           {filtered.slice(0, 8).map((place) => (
-            <button key={place.id} className={selected.id === place.id ? "spot-card active" : "spot-card"} onClick={() => choosePlace(place)}>
+            <button key={place.id} className={selected.id === place.id ? "spot-card active" : "spot-card"} onClick={() => selectPlace(place)}>
               <span className={`spot-icon ${markerTone[place.category]}`}>{place.category === "神社" ? "⛩" : place.category === "グルメ" ? "☕" : "✦"}</span>
               <span><small>{place.category}</small><strong>{place.name}</strong></span>
               <span aria-hidden="true">›</span>
@@ -547,28 +577,28 @@ export default function Home() {
           <a href="https://www.google.com/maps/d/viewer?mid=1TbtYyvz6fS9qpn43ZbrWi6NnRYDaVXs" target="_blank" rel="noreferrer">管理マップを見る ↗</a>
         </div>
       </footer>
-      {calculatorOpen && (
-        <div className="calculator-backdrop" role="presentation" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setCalculatorOpen(false);
+      {activeApp && (
+        <div className="mini-app-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setActiveAppId(null);
         }}>
-          <section className="calculator app-frame-modal" role="dialog" aria-modal="true" aria-labelledby="calculator-title">
-            <div className="calculator-head">
-              <div><small>SHIORI APPS</small><h2 id="calculator-title">しおり電卓</h2></div>
-              <button onClick={() => setCalculatorOpen(false)} aria-label="しおり電卓を閉じる">×</button>
+          <section className={`mini-app-modal ${activeApp.id}`} role="dialog" aria-modal="true" aria-labelledby="mini-app-title">
+            <div className="mini-app-head">
+              <div><small>SHIORI APPS</small><h2 id="mini-app-title">{activeApp.name}</h2></div>
+              <button onClick={() => setActiveAppId(null)} aria-label={`${activeApp.name}を閉じる`}>×</button>
             </div>
-            <div className="calculator-frame-wrap">
-              {!calculatorLoaded && <div className="calculator-loading">しおり電卓を開いています…</div>}
+            <div className="mini-app-frame-wrap">
+              {!appLoaded && <div className="mini-app-loading">{activeApp.name}を開いています…</div>}
               <iframe
-                src={SHIORI_CALCULATOR_URL}
-                title="しおり電卓"
+                src={activeApp.url}
+                title={activeApp.name}
                 loading="eager"
                 referrerPolicy="strict-origin-when-cross-origin"
-                onLoad={() => { setCalculatorLoaded(true); setCalculatorSlow(false); }}
+                onLoad={() => { setAppLoaded(true); setAppSlow(false); }}
               />
             </div>
-            <div className="calculator-fallback">
-              <span>{calculatorSlow ? "表示に時間がかかっています。" : "表示できない場合は"}</span>
-              <a href={SHIORI_CALCULATOR_URL} target="_blank" rel="noreferrer">新しいタブで開く ↗</a>
+            <div className="mini-app-fallback">
+              <span>{appSlow ? "表示に時間がかかっています。" : "表示できない場合は"}</span>
+              <a href={activeApp.url} target="_blank" rel="noreferrer">新しいタブで開く ↗</a>
             </div>
           </section>
         </div>
