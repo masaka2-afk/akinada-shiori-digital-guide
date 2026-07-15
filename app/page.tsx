@@ -133,6 +133,31 @@ const markerAsset: Record<Exclude<Category, "すべて">, string> = {
   美術館: "/marker-blue.png",
 };
 
+const myMapsInspiredStyle = [
+  { featureType: "all", elementType: "labels.text.fill", stylers: [{ color: "#52656b" }] },
+  { featureType: "all", elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 3 }] },
+  { featureType: "all", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+  { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#c8d1d0" }] },
+  { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#334f59" }] },
+  { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#eef5e9" }] },
+  { featureType: "landscape.natural.terrain", elementType: "geometry", stylers: [{ color: "#dcebd6" }] },
+  { featureType: "landscape.natural.landcover", elementType: "geometry", stylers: [{ color: "#e6f2df" }] },
+  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#d5eacb" }] },
+  { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#52705b" }] },
+  { featureType: "poi.business", stylers: [{ visibility: "off" }] },
+  { featureType: "poi.medical", stylers: [{ visibility: "off" }] },
+  { featureType: "poi.school", stylers: [{ visibility: "off" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#e1e5e6" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#cbd1d3" }, { weight: 1 }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#606f74" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#d6dcde" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#bcc6c9" }, { weight: 1.2 }] },
+  { featureType: "road.local", elementType: "geometry", stylers: [{ color: "#f1f3f3" }] },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#a9ddf0" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#3f7b91" }] },
+];
+
 type MapStatus = "loading" | "missing" | "ready" | "error";
 
 const SHIORI_CALCULATOR_URL = "https://masaka2-afk.github.io/chibi-shiori-calculator/";
@@ -145,6 +170,7 @@ export default function Home() {
   const [locating, setLocating] = useState(false);
   const [toast, setToast] = useState("");
   const [mapsApiKey, setMapsApiKey] = useState("");
+  const [mapsMapId, setMapsMapId] = useState("");
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
   const [appsMenuOpen, setAppsMenuOpen] = useState(false);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
@@ -187,8 +213,9 @@ export default function Home() {
   useEffect(() => {
     fetch("/api/maps-config", { cache: "no-store" })
       .then((response) => response.json())
-      .then((config: { apiKey?: string; configured?: boolean }) => {
+      .then((config: { apiKey?: string; mapId?: string; configured?: boolean }) => {
         if (config.configured && config.apiKey) {
+          setMapsMapId(config.mapId ?? "");
           setMapsApiKey(config.apiKey);
         } else {
           setMapStatus("missing");
@@ -211,23 +238,18 @@ export default function Home() {
 
     const renderMap = () => {
       if (!mapNode.current || !window.google) return;
-      const map = mapRef.current ?? new window.google.maps.Map(mapNode.current, {
+      const mapOptions: Record<string, unknown> = {
         center: { lat: 34.1889, lng: 132.687 },
         zoom: 12,
         disableDefaultUI: true,
         zoomControl: true,
+        clickableIcons: false,
+        backgroundColor: "#a9ddf0",
         gestureHandling: "greedy",
-        styles: [
-          { featureType: "poi", stylers: [{ visibility: "off" }] },
-          { featureType: "administrative", elementType: "labels.text.fill", stylers: [{ color: "#3e7189" }] },
-          { featureType: "water", elementType: "geometry", stylers: [{ color: "#a9deeb" }] },
-          { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#4b91a9" }] },
-          { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#edf6ef" }] },
-          { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
-          { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#7093a2" }] },
-          { featureType: "transit", stylers: [{ visibility: "off" }] },
-        ],
-      });
+      };
+      if (mapsMapId) mapOptions.mapId = mapsMapId;
+      else mapOptions.styles = myMapsInspiredStyle;
+      const map = mapRef.current ?? new window.google.maps.Map(mapNode.current, mapOptions);
       mapRef.current = map;
       clusterRef.current?.clearMarkers();
       markerRefs.current.forEach((marker) => marker.setMap(null));
@@ -239,8 +261,8 @@ export default function Home() {
           optimized: false,
           icon: {
             url: markerAsset[place.category],
-            scaledSize: new window.google.maps.Size(selected.id === place.id ? 58 : 44, selected.id === place.id ? 58 : 44),
-            anchor: new window.google.maps.Point(selected.id === place.id ? 29 : 22, selected.id === place.id ? 29 : 22),
+            scaledSize: new window.google.maps.Size(selected.id === place.id ? 62 : 48, selected.id === place.id ? 62 : 48),
+            anchor: new window.google.maps.Point(selected.id === place.id ? 31 : 24, selected.id === place.id ? 31 : 24),
           },
         });
         marker.__placeId = place.id;
@@ -258,8 +280,8 @@ export default function Home() {
             zIndex: 1000 + count,
             icon: {
               url: "/marker-blue.png",
-              scaledSize: new window.google.maps.Size(64, 64),
-              anchor: new window.google.maps.Point(32, 32),
+              scaledSize: new window.google.maps.Size(68, 68),
+              anchor: new window.google.maps.Point(34, 34),
             },
             label: { text: String(count), color: "#ffffff", fontSize: "14px", fontWeight: "800" },
           }),
@@ -291,13 +313,13 @@ export default function Home() {
       script.onerror = () => setMapStatus("error");
       document.head.appendChild(script);
     }
-  }, [filtered, mapsApiKey]);
+  }, [filtered, mapsApiKey, mapsMapId]);
 
   useEffect(() => {
     if (!window.google?.maps) return;
     markerRefs.current.forEach((marker) => {
       const active = marker.__placeId === selected.id;
-      const size = active ? 58 : 44;
+      const size = active ? 62 : 48;
       marker.setIcon({
         url: markerAsset[marker.__category as Exclude<Category, "すべて">],
         scaledSize: new window.google.maps.Size(size, size),
