@@ -165,6 +165,14 @@ footer img { width: 90px; height: 110px; object-fit: cover; object-position: 50%
 footer p { margin: 0; line-height: 1.8; color: rgba(255,255,255,.72); font-size: 11px; }
 footer strong { font: 700 17px Georgia, "Yu Mincho", serif; color: white; }
 footer a { margin-left: auto; color: white; border: 1px solid rgba(255,255,255,.3); border-radius: 999px; padding: 10px 15px; text-decoration: none; font-size: 11px; position: relative; z-index: 2; }
+.sync-panel { margin-left: auto; display: grid; justify-items: end; gap: 8px; position: relative; z-index: 2; }
+.sync-panel .sync-meta { display: grid; justify-items: end; line-height: 1.45; color: rgba(255,255,255,.8); }
+.sync-panel .sync-meta strong { font: 800 12px/1.4 "Noto Sans JP", sans-serif; }
+.sync-warning { color: #ffe4a8; }
+.sync-panel .sync-button { border: 0; border-radius: 999px; padding: 10px 16px; color: #075379; background: white; font-weight: 800; box-shadow: 0 8px 20px rgba(0,35,65,.2); cursor: pointer; }
+.sync-panel .sync-button:hover { transform: translateY(-1px); }
+.sync-panel .sync-button:disabled { opacity: .65; cursor: progress; transform: none; }
+.sync-panel a { margin-left: 0; padding: 7px 12px; }
 .toast { position: fixed; z-index: 99; left: 50%; bottom: 24px; transform: translateX(-50%); background: rgba(3,52,82,.92); color: white; border-radius: 999px; padding: 12px 18px; font-size: 12px; box-shadow: var(--shadow); }
 .calculator-launch {
   position: fixed; z-index: 70; right: 22px; bottom: 22px; min-height: 48px; padding: 10px 17px 10px 11px;
@@ -241,6 +249,10 @@ footer a { margin-left: auto; color: white; border: 1px solid rgba(255,255,255,.
   footer strong { font-size: 14px; }
   footer p { font-size: 9px; }
   footer a { display: none; }
+  .sync-panel { margin-left: auto; min-width: 145px; justify-items: end; }
+  .sync-panel .sync-meta { font-size: 8px; text-align: right; }
+  .sync-panel .sync-meta strong { font-size: 10px; }
+  .sync-panel .sync-button { padding: 9px 11px; font-size: 10px; }
   .calculator-launch { right: 13px; bottom: 13px; min-height: 45px; padding-right: 14px; }
   .calculator-backdrop { padding: 12px; place-items: end center; }
   .calculator { width: 100%; border-radius: 24px; padding-bottom: max(17px, env(safe-area-inset-bottom)); }

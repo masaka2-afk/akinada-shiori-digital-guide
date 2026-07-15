@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { MarkerClusterer } from "@googlemaps/markerclusterer";
 
 type Category = "すべて" | "絶景" | "歴史" | "神社" | "グルメ" | "公園" | "美術館";
 
@@ -13,6 +14,15 @@ type Place = {
   description: string;
   image?: string;
   youtube?: string;
+  photoUrl?: string;
+  sourceLayer?: string;
+};
+
+type SyncMeta = {
+  updatedAt?: string;
+  cached?: boolean;
+  syncError?: string;
+  spotCount?: number;
 };
 
 declare global {
@@ -114,6 +124,15 @@ const markerTone: Record<Exclude<Category, "すべて">, string> = {
   美術館: "blue",
 };
 
+const markerAsset: Record<Exclude<Category, "すべて">, string> = {
+  絶景: "/marker-blue.png",
+  歴史: "/marker-red.png",
+  神社: "/marker-red.png",
+  グルメ: "/marker-green.png",
+  公園: "/marker-green.png",
+  美術館: "/marker-blue.png",
+};
+
 type MapStatus = "loading" | "missing" | "ready" | "error";
 
 function calculateExpression(expression: string) {
@@ -153,18 +172,39 @@ export default function Home() {
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [calculation, setCalculation] = useState("0");
+  const [syncMeta, setSyncMeta] = useState<SyncMeta>({});
+  const [syncing, setSyncing] = useState(false);
   const mapNode = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markerRefs = useRef<any[]>([]);
+  const clusterRef = useRef<MarkerClusterer | null>(null);
 
-  useEffect(() => {
-    fetch("/api/places")
-      .then((response) => (response.ok ? response.json() : Promise.reject()))
-      .then((data: { places?: Place[] }) => {
-        if (data.places?.length) setPlaces(data.places);
-      })
-      .catch(() => undefined);
-  }, []);
+  const loadPlaces = async (manual = false) => {
+    setSyncing(true);
+    try {
+      const response = await fetch("/api/places", { method: manual ? "POST" : "GET", cache: "no-store" });
+      const data = await response.json() as { places?: Place[] } & SyncMeta;
+      if (!response.ok || !data.places?.length) throw new Error(data.syncError || "同期に失敗しました");
+      setPlaces(data.places);
+      setSelected((current) => data.places?.find((place) => place.id === current.id) ?? data.places![0]);
+      setSyncMeta({ updatedAt: data.updatedAt, cached: data.cached, syncError: data.syncError, spotCount: data.spotCount });
+      if (manual) {
+        setToast(data.cached ? "通信に失敗したため、前回のデータを表示しています" : `${data.places.length}スポットを再同期しました`);
+        window.setTimeout(() => setToast(""), 3000);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "同期に失敗しました";
+      setSyncMeta((current) => ({ ...current, syncError: message, cached: true }));
+      if (manual) {
+        setToast("再同期できませんでした。前回のデータを表示しています");
+        window.setTimeout(() => setToast(""), 3000);
+      }
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  useEffect(() => { void loadPlaces(false); }, []);
 
   useEffect(() => {
     fetch("/api/maps-config", { cache: "no-store" })
@@ -211,15 +251,41 @@ export default function Home() {
         ],
       });
       mapRef.current = map;
+      clusterRef.current?.clearMarkers();
       markerRefs.current.forEach((marker) => marker.setMap(null));
       markerRefs.current = filtered.map((place) => {
         const marker = new window.google.maps.Marker({
           position: { lat: place.lat, lng: place.lng },
           map,
           title: place.name,
+          optimized: false,
+          icon: {
+            url: markerAsset[place.category],
+            scaledSize: new window.google.maps.Size(selected.id === place.id ? 58 : 44, selected.id === place.id ? 58 : 44),
+            anchor: new window.google.maps.Point(selected.id === place.id ? 29 : 22, selected.id === place.id ? 29 : 22),
+          },
         });
+        marker.__placeId = place.id;
+        marker.__category = place.category;
         marker.addListener("click", () => setSelected(place));
         return marker;
+      });
+      clusterRef.current = new MarkerClusterer({
+        map,
+        markers: markerRefs.current,
+        renderer: {
+          render: ({ count, position }) => new window.google.maps.Marker({
+            position,
+            title: `${count}スポット`,
+            zIndex: 1000 + count,
+            icon: {
+              url: "/marker-blue.png",
+              scaledSize: new window.google.maps.Size(64, 64),
+              anchor: new window.google.maps.Point(32, 32),
+            },
+            label: { text: String(count), color: "#ffffff", fontSize: "14px", fontWeight: "800" },
+          }),
+        },
       });
       if (filtered.length) {
         const bounds = new window.google.maps.LatLngBounds();
@@ -248,6 +314,20 @@ export default function Home() {
       document.head.appendChild(script);
     }
   }, [filtered, mapsApiKey]);
+
+  useEffect(() => {
+    if (!window.google?.maps) return;
+    markerRefs.current.forEach((marker) => {
+      const active = marker.__placeId === selected.id;
+      const size = active ? 58 : 44;
+      marker.setIcon({
+        url: markerAsset[marker.__category as Exclude<Category, "すべて">],
+        scaledSize: new window.google.maps.Size(size, size),
+        anchor: new window.google.maps.Point(size / 2, size / 2),
+      });
+      marker.setZIndex(active ? 999 : undefined);
+    });
+  }, [selected.id]);
 
   const pressCalculator = (value: string) => {
     if (value === "C") {
@@ -437,7 +517,18 @@ export default function Home() {
       <footer>
         <img src="/shiori-guide.png" alt="案内する安芸灘しおり" />
         <p><strong>瀬戸内から、あなたの旅にやさしい風を。</strong><br />Googleマイマップを管理元にした、安芸灘しおり公式デジタルガイド</p>
-        <a href="https://www.google.com/maps/d/viewer?mid=1TbtYyvz6fS9qpn43ZbrWi6NnRYDaVXs" target="_blank" rel="noreferrer">管理マップを見る ↗</a>
+        <div className="sync-panel">
+          <p className="sync-meta">
+            <strong>Googleマイマップ連携</strong>
+            <span>{syncMeta.updatedAt ? `最終同期：${new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium", timeStyle: "short" }).format(new Date(syncMeta.updatedAt))}` : "同期情報を確認中…"}</span>
+            <span>{syncMeta.spotCount ?? places.length}スポット {syncMeta.cached ? "・キャッシュ表示" : "・最新データ"}</span>
+            {syncMeta.syncError && <span className="sync-warning">取得失敗時も前回データを表示します</span>}
+          </p>
+          <button className="sync-button" onClick={() => void loadPlaces(true)} disabled={syncing}>
+            {syncing ? "同期中…" : "マイマップを再同期"}
+          </button>
+          <a href="https://www.google.com/maps/d/viewer?mid=1TbtYyvz6fS9qpn43ZbrWi6NnRYDaVXs" target="_blank" rel="noreferrer">管理マップを見る ↗</a>
+        </div>
       </footer>
       {mapStatus === "ready" && (
         <button className="calculator-launch" onClick={() => setCalculatorOpen(true)} aria-label="しおり電卓を開く">
