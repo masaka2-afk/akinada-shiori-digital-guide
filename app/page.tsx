@@ -114,6 +114,34 @@ const markerTone: Record<Exclude<Category, "すべて">, string> = {
   美術館: "blue",
 };
 
+type MapStatus = "loading" | "missing" | "ready" | "error";
+
+function calculateExpression(expression: string) {
+  const normalized = expression.replace(/×/g, "*").replace(/÷/g, "/").replace(/−/g, "-");
+  const parts = normalized.match(/(?:\d+\.?\d*|\.\d+|[+\-*/])/g);
+  if (!parts || parts.join("") !== normalized || !/\d$/.test(normalized)) return null;
+  const values: (number | string)[] = parts.map((part) => (/[+\-*/]/.test(part) ? part : Number(part)));
+  for (let index = 1; index < values.length - 1;) {
+    const operator = values[index];
+    if (operator === "*" || operator === "/") {
+      const left = Number(values[index - 1]);
+      const right = Number(values[index + 1]);
+      if (operator === "/" && right === 0) return null;
+      values.splice(index - 1, 3, operator === "*" ? left * right : left / right);
+      index = 1;
+    } else {
+      index += 2;
+    }
+  }
+  let result = Number(values[0]);
+  for (let index = 1; index < values.length; index += 2) {
+    const operator = values[index];
+    const right = Number(values[index + 1]);
+    result = operator === "+" ? result + right : result - right;
+  }
+  return Number.isFinite(result) ? Math.round((result + Number.EPSILON) * 1e10) / 1e10 : null;
+}
+
 export default function Home() {
   const [places, setPlaces] = useState<Place[]>(fallbackPlaces);
   const [category, setCategory] = useState<Category>("すべて");
@@ -121,6 +149,10 @@ export default function Home() {
   const [selected, setSelected] = useState<Place>(fallbackPlaces[0]);
   const [locating, setLocating] = useState(false);
   const [toast, setToast] = useState("");
+  const [mapsApiKey, setMapsApiKey] = useState("");
+  const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
+  const [calculation, setCalculation] = useState("0");
   const mapNode = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markerRefs = useRef<any[]>([]);
@@ -134,6 +166,19 @@ export default function Home() {
       .catch(() => undefined);
   }, []);
 
+  useEffect(() => {
+    fetch("/api/maps-config", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((config: { apiKey?: string; configured?: boolean }) => {
+        if (config.configured && config.apiKey) {
+          setMapsApiKey(config.apiKey);
+        } else {
+          setMapStatus("missing");
+        }
+      })
+      .catch(() => setMapStatus("error"));
+  }, []);
+
   const filtered = useMemo(() => {
     const keyword = query.trim().toLocaleLowerCase("ja");
     return places.filter((place) => {
@@ -144,8 +189,7 @@ export default function Home() {
   }, [places, category, query]);
 
   useEffect(() => {
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    if (!apiKey || !mapNode.current) return;
+    if (!mapsApiKey || !mapNode.current) return;
 
     const renderMap = () => {
       if (!mapNode.current || !window.google) return;
@@ -157,9 +201,13 @@ export default function Home() {
         gestureHandling: "greedy",
         styles: [
           { featureType: "poi", stylers: [{ visibility: "off" }] },
-          { featureType: "water", elementType: "geometry", stylers: [{ color: "#a8e2ee" }] },
-          { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#eaf4df" }] },
+          { featureType: "administrative", elementType: "labels.text.fill", stylers: [{ color: "#3e7189" }] },
+          { featureType: "water", elementType: "geometry", stylers: [{ color: "#a9deeb" }] },
+          { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#4b91a9" }] },
+          { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#edf6ef" }] },
           { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+          { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#7093a2" }] },
+          { featureType: "transit", stylers: [{ visibility: "off" }] },
         ],
       });
       mapRef.current = map;
@@ -173,6 +221,17 @@ export default function Home() {
         marker.addListener("click", () => setSelected(place));
         return marker;
       });
+      if (filtered.length) {
+        const bounds = new window.google.maps.LatLngBounds();
+        filtered.forEach((place) => bounds.extend({ lat: place.lat, lng: place.lng }));
+        if (filtered.length === 1) {
+          map.setCenter({ lat: filtered[0].lat, lng: filtered[0].lng });
+          map.setZoom(15);
+        } else {
+          map.fitBounds(bounds, 48);
+        }
+      }
+      setMapStatus("ready");
     };
 
     if (window.google?.maps) {
@@ -183,11 +242,33 @@ export default function Home() {
     if (!document.querySelector("script[data-akinada-map]")) {
       const script = document.createElement("script");
       script.dataset.akinadaMap = "true";
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=__akinadaMapReady`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(mapsApiKey)}&callback=__akinadaMapReady&v=weekly&language=ja&region=JP`;
       script.async = true;
+      script.onerror = () => setMapStatus("error");
       document.head.appendChild(script);
     }
-  }, [filtered]);
+  }, [filtered, mapsApiKey]);
+
+  const pressCalculator = (value: string) => {
+    if (value === "C") {
+      setCalculation("0");
+      return;
+    }
+    if (value === "⌫") {
+      setCalculation((current) => current.length > 1 ? current.slice(0, -1) : "0");
+      return;
+    }
+    if (value === "=") {
+      const result = calculateExpression(calculation);
+      setCalculation(result === null ? "計算できません" : String(result));
+      return;
+    }
+    setCalculation((current) => {
+      const reset = current === "0" || current === "計算できません";
+      if (/[+−×÷]/.test(value) && (reset || /[+−×÷]$/.test(current))) return current;
+      return `${reset ? "" : current}${value}`.slice(0, 20);
+    });
+  };
 
   const choosePlace = (place: Place) => {
     setSelected(place);
@@ -281,7 +362,7 @@ export default function Home() {
       <section className="guide-layout">
         <div className="map-panel">
           <div ref={mapNode} className="google-map" aria-label="安芸灘の観光地図" />
-          {!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY && (
+          {mapStatus !== "ready" && (
             <div className="fallback-map" aria-label="安芸灘観光地図プレビュー">
               <div className="map-sea-label">SETO INLAND SEA</div>
               <div className="island island-one"><span>下蒲刈島</span></div>
@@ -302,7 +383,11 @@ export default function Home() {
                   <span>{index + 1}</span>
                 </button>
               ))}
-              <p className="preview-note">Google Maps APIキー設定後、自動でライブ地図に切り替わります</p>
+              <p className={`preview-note ${mapStatus === "error" ? "error" : ""}`}>
+                {mapStatus === "loading" && "ライブGoogleマップを読み込んでいます…"}
+                {mapStatus === "missing" && "Google Maps APIキーを .env に設定してください"}
+                {mapStatus === "error" && "Googleマップを読み込めませんでした。APIキーの設定を確認してください"}
+              </p>
             </div>
           )}
           <button className="locate-button" onClick={locateMe} disabled={locating}>
@@ -354,6 +439,34 @@ export default function Home() {
         <p><strong>瀬戸内から、あなたの旅にやさしい風を。</strong><br />Googleマイマップを管理元にした、安芸灘しおり公式デジタルガイド</p>
         <a href="https://www.google.com/maps/d/viewer?mid=1TbtYyvz6fS9qpn43ZbrWi6NnRYDaVXs" target="_blank" rel="noreferrer">管理マップを見る ↗</a>
       </footer>
+      {mapStatus === "ready" && (
+        <button className="calculator-launch" onClick={() => setCalculatorOpen(true)} aria-label="しおり電卓を開く">
+          <span aria-hidden="true">♢</span>しおり電卓
+        </button>
+      )}
+      {calculatorOpen && (
+        <div className="calculator-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setCalculatorOpen(false);
+        }}>
+          <section className="calculator" role="dialog" aria-modal="true" aria-labelledby="calculator-title">
+            <div className="calculator-head">
+              <div><small>SHIORI MINI APP</small><h2 id="calculator-title">しおり電卓</h2></div>
+              <button onClick={() => setCalculatorOpen(false)} aria-label="しおり電卓を閉じる">×</button>
+            </div>
+            <output className="calculator-display" aria-live="polite">{calculation}</output>
+            <div className="calculator-keys">
+              {["C", "⌫", "÷", "×", "7", "8", "9", "−", "4", "5", "6", "+", "1", "2", "3", "=", "0", "."].map((key) => (
+                <button
+                  key={key}
+                  className={`${/[+−×÷=]/.test(key) ? "operator" : ""} ${key === "0" ? "wide" : ""} ${key === "=" ? "equals" : ""}`}
+                  onClick={() => pressCalculator(key)}
+                >{key}</button>
+              ))}
+            </div>
+            <p>旅の予算計算にも使ってね♪</p>
+          </section>
+        </div>
+      )}
       {toast && <div className="toast" role="status">{toast}</div>}
     </main>
   );
