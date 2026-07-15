@@ -137,23 +137,37 @@ const markerAsset: Record<Exclude<Category, "すべて">, string> = {
 const myMapsInspiredStyle = [
   { featureType: "all", elementType: "labels.text.fill", stylers: [{ color: "#52656b" }] },
   { featureType: "all", elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 3 }] },
-  { featureType: "all", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
   { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#c8d1d0" }] },
   { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#334f59" }] },
+  { featureType: "administrative.neighborhood", elementType: "labels", stylers: [{ visibility: "on" }] },
+  { featureType: "administrative.neighborhood", elementType: "labels.text.fill", stylers: [{ color: "#496268" }] },
   { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#eef5e9" }] },
   { featureType: "landscape.natural.terrain", elementType: "geometry", stylers: [{ color: "#dcebd6" }] },
   { featureType: "landscape.natural.landcover", elementType: "geometry", stylers: [{ color: "#e6f2df" }] },
   { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#d5eacb" }] },
   { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#52705b" }] },
-  { featureType: "poi.business", stylers: [{ visibility: "off" }] },
-  { featureType: "poi.medical", stylers: [{ visibility: "off" }] },
-  { featureType: "poi.school", stylers: [{ visibility: "off" }] },
+  { featureType: "poi", elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 3 }] },
+  { featureType: "poi", elementType: "labels.icon", stylers: [{ saturation: -55 }, { lightness: 18 }] },
+  { featureType: "poi.business", elementType: "labels", stylers: [{ visibility: "on" }] },
+  { featureType: "poi.business", elementType: "labels.text.fill", stylers: [{ color: "#4f6064" }] },
+  { featureType: "poi.government", elementType: "labels", stylers: [{ visibility: "on" }] },
+  { featureType: "poi.government", elementType: "labels.text.fill", stylers: [{ color: "#445e68" }] },
+  { featureType: "poi.medical", elementType: "labels", stylers: [{ visibility: "on" }] },
+  { featureType: "poi.place_of_worship", elementType: "labels", stylers: [{ visibility: "on" }] },
+  { featureType: "poi.place_of_worship", elementType: "labels.text.fill", stylers: [{ color: "#655a70" }] },
+  { featureType: "poi.school", elementType: "labels", stylers: [{ visibility: "on" }] },
+  { featureType: "poi.school", elementType: "labels.text.fill", stylers: [{ color: "#4d6670" }] },
+  { featureType: "poi.sports_complex", elementType: "labels", stylers: [{ visibility: "simplified" }] },
   { featureType: "road", elementType: "geometry", stylers: [{ color: "#e1e5e6" }] },
   { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#cbd1d3" }, { weight: 1 }] },
   { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#606f74" }] },
+  { featureType: "road", elementType: "labels.icon", stylers: [{ visibility: "on" }] },
   { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#d6dcde" }] },
   { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#bcc6c9" }, { weight: 1.2 }] },
-  { featureType: "road.local", elementType: "geometry", stylers: [{ color: "#f1f3f3" }] },
+  { featureType: "road.arterial", elementType: "labels", stylers: [{ visibility: "on" }] },
+  { featureType: "road.local", elementType: "geometry", stylers: [{ color: "#f3f4f2" }] },
+  { featureType: "road.local", elementType: "geometry.stroke", stylers: [{ color: "#cfd5d5" }, { weight: 0.8 }] },
+  { featureType: "road.local", elementType: "labels", stylers: [{ visibility: "on" }] },
   { featureType: "transit", stylers: [{ visibility: "off" }] },
   { featureType: "water", elementType: "geometry", stylers: [{ color: "#a9ddf0" }] },
   { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#3f7b91" }] },
@@ -195,7 +209,7 @@ export default function Home() {
   const [activeAppId, setActiveAppId] = useState<MiniAppId | null>(null);
   const [appLoaded, setAppLoaded] = useState(false);
   const [appSlow, setAppSlow] = useState(false);
-  const [memoText, setMemoText] = useState(() => pickMemo(fallbackPlaces[0].category));
+  const [memoText, setMemoText] = useState(shioriMemos.common[0]);
   const [syncMeta, setSyncMeta] = useState<SyncMeta>({});
   const [syncing, setSyncing] = useState(false);
   const mapNode = useRef<HTMLDivElement>(null);
@@ -259,7 +273,7 @@ export default function Home() {
     setMemoText((previous) => pickMemo(place.category, previous));
     if (moveMap) {
       mapRef.current?.panTo({ lat: place.lat, lng: place.lng });
-      mapRef.current?.setZoom(15);
+      mapRef.current?.setZoom(17);
     }
   };
 
@@ -301,7 +315,7 @@ export default function Home() {
         });
         marker.__placeId = place.id;
         marker.__category = place.category;
-        marker.addListener("click", () => selectPlace(place, false));
+        marker.addListener("click", () => selectPlace(place));
         return marker;
       });
       clusterRef.current = new MarkerClusterer({
