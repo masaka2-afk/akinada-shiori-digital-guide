@@ -135,31 +135,7 @@ const markerAsset: Record<Exclude<Category, "すべて">, string> = {
 
 type MapStatus = "loading" | "missing" | "ready" | "error";
 
-function calculateExpression(expression: string) {
-  const normalized = expression.replace(/×/g, "*").replace(/÷/g, "/").replace(/−/g, "-");
-  const parts = normalized.match(/(?:\d+\.?\d*|\.\d+|[+\-*/])/g);
-  if (!parts || parts.join("") !== normalized || !/\d$/.test(normalized)) return null;
-  const values: (number | string)[] = parts.map((part) => (/[+\-*/]/.test(part) ? part : Number(part)));
-  for (let index = 1; index < values.length - 1;) {
-    const operator = values[index];
-    if (operator === "*" || operator === "/") {
-      const left = Number(values[index - 1]);
-      const right = Number(values[index + 1]);
-      if (operator === "/" && right === 0) return null;
-      values.splice(index - 1, 3, operator === "*" ? left * right : left / right);
-      index = 1;
-    } else {
-      index += 2;
-    }
-  }
-  let result = Number(values[0]);
-  for (let index = 1; index < values.length; index += 2) {
-    const operator = values[index];
-    const right = Number(values[index + 1]);
-    result = operator === "+" ? result + right : result - right;
-  }
-  return Number.isFinite(result) ? Math.round((result + Number.EPSILON) * 1e10) / 1e10 : null;
-}
+const SHIORI_CALCULATOR_URL = "https://masaka2-afk.github.io/chibi-shiori-calculator/";
 
 export default function Home() {
   const [places, setPlaces] = useState<Place[]>(fallbackPlaces);
@@ -170,8 +146,10 @@ export default function Home() {
   const [toast, setToast] = useState("");
   const [mapsApiKey, setMapsApiKey] = useState("");
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
+  const [appsMenuOpen, setAppsMenuOpen] = useState(false);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
-  const [calculation, setCalculation] = useState("0");
+  const [calculatorLoaded, setCalculatorLoaded] = useState(false);
+  const [calculatorSlow, setCalculatorSlow] = useState(false);
   const [syncMeta, setSyncMeta] = useState<SyncMeta>({});
   const [syncing, setSyncing] = useState(false);
   const mapNode = useRef<HTMLDivElement>(null);
@@ -329,26 +307,28 @@ export default function Home() {
     });
   }, [selected.id]);
 
-  const pressCalculator = (value: string) => {
-    if (value === "C") {
-      setCalculation("0");
-      return;
-    }
-    if (value === "⌫") {
-      setCalculation((current) => current.length > 1 ? current.slice(0, -1) : "0");
-      return;
-    }
-    if (value === "=") {
-      const result = calculateExpression(calculation);
-      setCalculation(result === null ? "計算できません" : String(result));
-      return;
-    }
-    setCalculation((current) => {
-      const reset = current === "0" || current === "計算できません";
-      if (/[+−×÷]/.test(value) && (reset || /[+−×÷]$/.test(current))) return current;
-      return `${reset ? "" : current}${value}`.slice(0, 20);
-    });
+  const openCalculator = () => {
+    setAppsMenuOpen(false);
+    setCalculatorLoaded(false);
+    setCalculatorSlow(false);
+    setCalculatorOpen(true);
   };
+
+  useEffect(() => {
+    if (!calculatorOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const slowTimer = window.setTimeout(() => setCalculatorSlow(true), 6000);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setCalculatorOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.clearTimeout(slowTimer);
+      window.removeEventListener("keydown", closeOnEscape);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [calculatorOpen]);
 
   const choosePlace = (place: Place) => {
     setSelected(place);
@@ -408,9 +388,24 @@ export default function Home() {
             <p className="tagline">旅のしおりは、しおりちゃんにおまかせ♪</p>
           </div>
         </div>
-        <a className="official-link" href="https://shiorichan-guide.my.canva.site/" target="_blank" rel="noreferrer">
-          公式サイト <span aria-hidden="true">↗</span>
-        </a>
+        <div className="top-actions">
+          <button className="apps-menu-button" onClick={() => setAppsMenuOpen((open) => !open)} aria-label="しおりアプリ" aria-expanded={appsMenuOpen} aria-haspopup="menu">
+            <span aria-hidden="true">▦</span><strong>しおりアプリ</strong>
+          </button>
+          <a className="official-link" href="https://shiorichan-guide.my.canva.site/" target="_blank" rel="noreferrer">
+            公式サイト <span aria-hidden="true">↗</span>
+          </a>
+          {appsMenuOpen && (
+            <div className="apps-menu" role="menu" aria-label="しおりアプリ">
+              <p><strong>しおりアプリ</strong><small>旅に便利なミニアプリ</small></p>
+              <button role="menuitem" onClick={openCalculator}>
+                <span className="app-icon" aria-hidden="true">▦</span>
+                <span><strong>しおり電卓</strong><small>旅費やお買い物の計算に</small></span>
+                <span aria-hidden="true">›</span>
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
       <section className="finder" aria-label="観光スポット検索">
@@ -530,31 +525,29 @@ export default function Home() {
           <a href="https://www.google.com/maps/d/viewer?mid=1TbtYyvz6fS9qpn43ZbrWi6NnRYDaVXs" target="_blank" rel="noreferrer">管理マップを見る ↗</a>
         </div>
       </footer>
-      {mapStatus === "ready" && (
-        <button className="calculator-launch" onClick={() => setCalculatorOpen(true)} aria-label="しおり電卓を開く">
-          <span aria-hidden="true">♢</span>しおり電卓
-        </button>
-      )}
       {calculatorOpen && (
         <div className="calculator-backdrop" role="presentation" onMouseDown={(event) => {
           if (event.target === event.currentTarget) setCalculatorOpen(false);
         }}>
-          <section className="calculator" role="dialog" aria-modal="true" aria-labelledby="calculator-title">
+          <section className="calculator app-frame-modal" role="dialog" aria-modal="true" aria-labelledby="calculator-title">
             <div className="calculator-head">
-              <div><small>SHIORI MINI APP</small><h2 id="calculator-title">しおり電卓</h2></div>
+              <div><small>SHIORI APPS</small><h2 id="calculator-title">しおり電卓</h2></div>
               <button onClick={() => setCalculatorOpen(false)} aria-label="しおり電卓を閉じる">×</button>
             </div>
-            <output className="calculator-display" aria-live="polite">{calculation}</output>
-            <div className="calculator-keys">
-              {["C", "⌫", "÷", "×", "7", "8", "9", "−", "4", "5", "6", "+", "1", "2", "3", "=", "0", "."].map((key) => (
-                <button
-                  key={key}
-                  className={`${/[+−×÷=]/.test(key) ? "operator" : ""} ${key === "0" ? "wide" : ""} ${key === "=" ? "equals" : ""}`}
-                  onClick={() => pressCalculator(key)}
-                >{key}</button>
-              ))}
+            <div className="calculator-frame-wrap">
+              {!calculatorLoaded && <div className="calculator-loading">しおり電卓を開いています…</div>}
+              <iframe
+                src={SHIORI_CALCULATOR_URL}
+                title="しおり電卓"
+                loading="eager"
+                referrerPolicy="strict-origin-when-cross-origin"
+                onLoad={() => { setCalculatorLoaded(true); setCalculatorSlow(false); }}
+              />
             </div>
-            <p>旅の予算計算にも使ってね♪</p>
+            <div className="calculator-fallback">
+              <span>{calculatorSlow ? "表示に時間がかかっています。" : "表示できない場合は"}</span>
+              <a href={SHIORI_CALCULATOR_URL} target="_blank" rel="noreferrer">新しいタブで開く ↗</a>
+            </div>
           </section>
         </div>
       )}
