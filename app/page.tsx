@@ -319,8 +319,9 @@ export default function Home() {
 
     const renderMap = async () => {
       if (!mapNode.current || !window.google?.maps?.importLibrary) return;
-      const [{ Map: GoogleMap, LatLngBounds, Point, Size }, markerLibrary] = await Promise.all([
+      const [{ Map: GoogleMap, LatLngBounds }, { Point, Size, SymbolPath }, markerLibrary] = await Promise.all([
         window.google.maps.importLibrary("maps"),
+        window.google.maps.importLibrary("core"),
         window.google.maps.importLibrary("marker"),
       ]);
       if (!mapNode.current) return;
@@ -332,7 +333,7 @@ export default function Home() {
         setMapStatus("error");
         return;
       }
-      mapsLibraryRef.current = { LatLngBounds, Point, Size };
+      mapsLibraryRef.current = { LatLngBounds, Point, Size, SymbolPath };
       markerConstructorRef.current = GoogleMarker;
       markerModeRef.current = useAdvancedMarkers ? "advanced" : "legacy";
       const markerContent = (url: string, size: number, glow = false) => {
@@ -548,7 +549,7 @@ export default function Home() {
               map: mapRef.current,
               title: "迴ｾ蝨ｨ蝨ｰ",
               icon: {
-                path: window.google.maps.SymbolPath.CIRCLE,
+                path: mapsLibraryRef.current.SymbolPath.CIRCLE,
                 scale: 8,
                 fillColor: "#147fbd",
                 fillOpacity: 1,
