@@ -231,6 +231,7 @@ export default function Home() {
   const mapRef = useRef<any>(null);
   const mapsLibraryRef = useRef<any>(null);
   const markerConstructorRef = useRef<any>(null);
+  const markerModeRef = useRef<"advanced" | "legacy">("legacy");
   const markerRefs = useRef<any[]>([]);
   const clusterRef = useRef<MarkerClusterer | null>(null);
   const activeApp = miniApps.find((app) => app.id === activeAppId) ?? null;
@@ -318,13 +319,22 @@ export default function Home() {
 
     const renderMap = async () => {
       if (!mapNode.current || !window.google?.maps?.importLibrary) return;
-      const [{ Map: GoogleMap, LatLngBounds }, { AdvancedMarkerElement: GoogleMarker }] = await Promise.all([
+      const [{ Map: GoogleMap, LatLngBounds, Point, Size }, markerLibrary] = await Promise.all([
         window.google.maps.importLibrary("maps"),
         window.google.maps.importLibrary("marker"),
       ]);
       if (!mapNode.current) return;
-      mapsLibraryRef.current = { LatLngBounds };
+      const AdvancedMarker = markerLibrary.AdvancedMarkerElement;
+      const LegacyMarker = window.google.maps.Marker;
+      const useAdvancedMarkers = Boolean(mapsMapId && AdvancedMarker);
+      const GoogleMarker = useAdvancedMarkers ? AdvancedMarker : LegacyMarker;
+      if (!GoogleMarker) {
+        setMapStatus("error");
+        return;
+      }
+      mapsLibraryRef.current = { LatLngBounds, Point, Size };
       markerConstructorRef.current = GoogleMarker;
+      markerModeRef.current = useAdvancedMarkers ? "advanced" : "legacy";
       const markerContent = (url: string, size: number, glow = false) => {
         const image = document.createElement("img");
         image.src = url;
@@ -353,13 +363,27 @@ export default function Home() {
       const map = mapRef.current ?? new GoogleMap(mapNode.current, mapOptions);
       mapRef.current = map;
       clusterRef.current?.clearMarkers();
-      markerRefs.current.forEach((marker) => { marker.map = null; });
+      markerRefs.current.forEach((marker) => {
+        if (markerModeRef.current === "advanced") marker.map = null;
+        else marker.setMap?.(null);
+      });
       markerRefs.current = filtered.map((place) => {
+        const size = selected.id === place.id ? 62 : 48;
+        const markerOptions = useAdvancedMarkers
+          ? { content: markerContent(markerAsset[place.category], size, selected.id === place.id) }
+          : {
+              optimized: false,
+              icon: {
+                url: markerAsset[place.category],
+                scaledSize: new Size(size, size),
+                anchor: new Point(size / 2, size / 2),
+              },
+            };
         const marker = new GoogleMarker({
           position: { lat: place.lat, lng: place.lng },
           map,
           title: place.name,
-          content: markerContent(markerAsset[place.category], selected.id === place.id ? 62 : 48, selected.id === place.id),
+          ...markerOptions,
         });
         marker.__placeId = place.id;
         marker.__category = place.category;
@@ -383,8 +407,21 @@ export default function Home() {
            label: { text: String(count), color: "#ffffff", fontSize: "14px", fontWeight: "800" },
          }),
            */
-           render: ({ count, position }) => {
-            const clusterContent = document.createElement("div");
+            render: ({ count, position }) => {
+              if (!useAdvancedMarkers) {
+                return new GoogleMarker({
+                  position,
+                  title: String(count) + "スポット",
+                  zIndex: 1000 + count,
+                  icon: {
+                    url: assetPath("marker-blue.png"),
+                    scaledSize: new Size(68, 68),
+                    anchor: new Point(34, 34),
+                  },
+                  label: { text: String(count), color: "#ffffff", fontSize: "14px", fontWeight: "800" },
+                });
+              }
+              const clusterContent = document.createElement("div");
             clusterContent.style.position = "relative";
             clusterContent.style.width = "68px";
             clusterContent.style.height = "68px";
@@ -438,6 +475,15 @@ export default function Home() {
     markerRefs.current.forEach((marker) => {
       const active = marker.__placeId === selected.id;
       const size = active ? 62 : 48;
+      if (markerModeRef.current === "legacy") {
+        marker.setIcon({
+          url: markerAsset[marker.__category as Exclude<Category, "縺吶∋縺ｦ">],
+          scaledSize: new mapsLibrary.Size(size, size),
+          anchor: new mapsLibrary.Point(size / 2, size / 2),
+        });
+        marker.setZIndex(active ? 999 : undefined);
+        return;
+      }
       /*
       marker.setIcon({
         url: markerAsset[marker.__category as Exclude<Category, "すべて">],
@@ -496,6 +542,21 @@ export default function Home() {
         mapRef.current?.setZoom(14);
         const GoogleMarker = markerConstructorRef.current;
         if (mapRef.current && GoogleMarker) {
+          if (markerModeRef.current === "legacy") {
+            new GoogleMarker({
+              position: current,
+              map: mapRef.current,
+              title: "迴ｾ蝨ｨ蝨ｰ",
+              icon: {
+                path: window.google.maps.SymbolPath.CIRCLE,
+                scale: 8,
+                fillColor: "#147fbd",
+                fillOpacity: 1,
+                strokeColor: "#fff",
+                strokeWeight: 3,
+              },
+            });
+          } else {
           const currentDot = document.createElement("div");
           currentDot.style.width = "18px";
           currentDot.style.height = "18px";
@@ -519,6 +580,7 @@ export default function Home() {
             },
             */
           });
+          }
         }
         setLocating(false);
         setToast("現在地を表示しました");
