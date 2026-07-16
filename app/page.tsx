@@ -325,7 +325,7 @@ export default function Home() {
       ]);
       if (!mapNode.current) return;
       const AdvancedMarker = markerLibrary.AdvancedMarkerElement;
-      const LegacyMarker = window.google.maps.Marker;
+      const LegacyMarker = markerLibrary.Marker;
       const useAdvancedMarkers = Boolean(mapsMapId && AdvancedMarker);
       const GoogleMarker = useAdvancedMarkers ? AdvancedMarker : LegacyMarker;
       if (!GoogleMarker) {
