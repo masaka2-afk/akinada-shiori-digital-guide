@@ -18,6 +18,10 @@ concurrency:
 
 jobs:
   build:
+    env:
+      # GitHub may expose the pre-rename slug briefly while Pages settles.
+      # Keep all Vite assets and runtime data on the official URL.
+      PAGES_BASE_PATH: /akinada-shiori-digital-guide/
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
