@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 
-const repository = process.env.GITHUB_REPOSITORY?.split("/")[1] ?? "akinada-shiori-digital-guide-beta";
+const repository = process.env.GITHUB_REPOSITORY?.split("/")[1] ?? "akinada-shiori-digital-guide";
 const basePath = (process.env.PAGES_BASE_PATH ?? `/${repository}`).replace(/\/$/, "");
 const apiKey = process.env.GOOGLE_MAPS_API_KEY?.trim() ?? "";
 const mapId = process.env.GOOGLE_MAPS_MAP_ID?.trim() ?? "";

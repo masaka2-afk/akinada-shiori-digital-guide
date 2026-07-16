@@ -1,0 +1,15 @@
+import type { MetadataRoute } from "next";
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: "安芸灘しおり Digital Guide",
+    short_name: "安芸灘しおり",
+    description: "安芸灘とびしま海道の公式デジタル観光ガイド",
+    lang: "ja",
+    start_url: "/",
+    display: "standalone",
+    background_color: "#f7fcfb",
+    theme_color: "#e9fbff",
+    icons: [{ src: "/shiori-icon.png", sizes: "1024x1024", type: "image/png", purpose: "any maskable" }],
+  };
+}

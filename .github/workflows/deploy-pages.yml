@@ -1,4 +1,4 @@
-name: Deploy Digital Guide beta to GitHub Pages
+name: Deploy Digital Guide to GitHub Pages
 
 on:
   push:
