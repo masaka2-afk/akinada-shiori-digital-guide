@@ -318,13 +318,27 @@ export default function Home() {
 
     const renderMap = async () => {
       if (!mapNode.current || !window.google?.maps?.importLibrary) return;
-      const [{ Map: GoogleMap, LatLngBounds, Point, Size }, { Marker: GoogleMarker }] = await Promise.all([
+      const [{ Map: GoogleMap, LatLngBounds }, { AdvancedMarkerElement: GoogleMarker }] = await Promise.all([
         window.google.maps.importLibrary("maps"),
         window.google.maps.importLibrary("marker"),
       ]);
       if (!mapNode.current) return;
-      mapsLibraryRef.current = { LatLngBounds, Point, Size };
+      mapsLibraryRef.current = { LatLngBounds };
       markerConstructorRef.current = GoogleMarker;
+      const markerContent = (url: string, size: number, glow = false) => {
+        const image = document.createElement("img");
+        image.src = url;
+        image.width = size;
+        image.height = size;
+        image.alt = "";
+        image.draggable = false;
+        image.style.display = "block";
+        image.style.width = size + "px";
+        image.style.height = size + "px";
+        image.style.objectFit = "contain";
+        image.style.filter = glow ? "drop-shadow(0 0 10px rgba(255,255,255,.95)) drop-shadow(0 0 8px rgba(20,127,189,.8))" : "drop-shadow(0 2px 3px rgba(20,72,88,.22))";
+        return image;
+      };
       const mapOptions: Record<string, unknown> = {
         center: { lat: 34.1889, lng: 132.687 },
         zoom: 12,
@@ -339,18 +353,13 @@ export default function Home() {
       const map = mapRef.current ?? new GoogleMap(mapNode.current, mapOptions);
       mapRef.current = map;
       clusterRef.current?.clearMarkers();
-      markerRefs.current.forEach((marker) => marker.setMap(null));
+      markerRefs.current.forEach((marker) => { marker.map = null; });
       markerRefs.current = filtered.map((place) => {
         const marker = new GoogleMarker({
           position: { lat: place.lat, lng: place.lng },
           map,
           title: place.name,
-          optimized: false,
-          icon: {
-            url: markerAsset[place.category],
-            scaledSize: new Size(selected.id === place.id ? 62 : 48, selected.id === place.id ? 62 : 48),
-            anchor: new Point(selected.id === place.id ? 31 : 24, selected.id === place.id ? 31 : 24),
-          },
+          content: markerContent(markerAsset[place.category], selected.id === place.id ? 62 : 48, selected.id === place.id),
         });
         marker.__placeId = place.id;
         marker.__category = place.category;
@@ -361,17 +370,38 @@ export default function Home() {
         map,
         markers: markerRefs.current,
         renderer: {
-          render: ({ count, position }) => new GoogleMarker({
-            position,
-            title: `${count}スポット`,
-            zIndex: 1000 + count,
-            icon: {
-              url: assetPath("marker-blue.png"),
-              scaledSize: new Size(68, 68),
-              anchor: new Point(34, 34),
-            },
-            label: { text: String(count), color: "#ffffff", fontSize: "14px", fontWeight: "800" },
-          }),
+         /*
+         render: ({ count, position }) => {
+           position,
+           title: `${count}スポット`,
+           zIndex: 1000 + count,
+           icon: {
+             url: assetPath("marker-blue.png"),
+             scaledSize: new Size(68, 68),
+             anchor: new Point(34, 34),
+           },
+           label: { text: String(count), color: "#ffffff", fontSize: "14px", fontWeight: "800" },
+         }),
+           */
+           render: ({ count, position }) => {
+            const clusterContent = document.createElement("div");
+            clusterContent.style.position = "relative";
+            clusterContent.style.width = "68px";
+            clusterContent.style.height = "68px";
+            clusterContent.style.filter = "drop-shadow(0 2px 4px rgba(20,72,88,.28))";
+            clusterContent.append(markerContent(assetPath("marker-blue.png"), 68));
+            const label = document.createElement("span");
+            label.textContent = String(count);
+            label.style.position = "absolute";
+            label.style.inset = "0";
+            label.style.display = "grid";
+            label.style.placeItems = "center";
+            label.style.color = "#fff";
+            label.style.font = "800 14px system-ui, sans-serif";
+            label.style.pointerEvents = "none";
+            clusterContent.append(label);
+            return new GoogleMarker({ position, title: String(count) + "スポット", zIndex: 1000 + count, content: clusterContent });
+          },
         },
       });
       if (filtered.length) {
@@ -408,12 +438,25 @@ export default function Home() {
     markerRefs.current.forEach((marker) => {
       const active = marker.__placeId === selected.id;
       const size = active ? 62 : 48;
+      /*
       marker.setIcon({
         url: markerAsset[marker.__category as Exclude<Category, "すべて">],
         scaledSize: new mapsLibrary.Size(size, size),
         anchor: new mapsLibrary.Point(size / 2, size / 2),
       });
-      marker.setZIndex(active ? 999 : undefined);
+      */
+      const content = marker.content as HTMLElement | undefined;
+      const image = content instanceof HTMLImageElement ? content : content?.querySelector("img");
+      if (image instanceof HTMLImageElement) {
+        image.width = size;
+        image.height = size;
+        image.style.width = size + "px";
+        image.style.height = size + "px";
+        image.style.filter = active
+          ? "drop-shadow(0 0 10px rgba(255,255,255,.95)) drop-shadow(0 0 8px rgba(20,127,189,.8))"
+          : "drop-shadow(0 2px 3px rgba(20,72,88,.22))";
+      }
+      marker.zIndex = active ? 999 : undefined;
     });
   }, [selected.id]);
 
@@ -452,12 +495,20 @@ export default function Home() {
         mapRef.current?.panTo(current);
         mapRef.current?.setZoom(14);
         const GoogleMarker = markerConstructorRef.current;
-        const SymbolPath = mapsLibraryRef.current?.SymbolPath;
-        if (mapRef.current && GoogleMarker && SymbolPath) {
+        if (mapRef.current && GoogleMarker) {
+          const currentDot = document.createElement("div");
+          currentDot.style.width = "18px";
+          currentDot.style.height = "18px";
+          currentDot.style.borderRadius = "50%";
+          currentDot.style.background = "#147fbd";
+          currentDot.style.border = "3px solid #fff";
+          currentDot.style.boxShadow = "0 1px 7px rgba(20,72,88,.45)";
           new GoogleMarker({
+            content: currentDot,
             position: current,
             map: mapRef.current,
             title: "現在地",
+            /*
             icon: {
               path: SymbolPath.CIRCLE,
               scale: 8,
@@ -466,6 +517,7 @@ export default function Home() {
               strokeColor: "#fff",
               strokeWeight: 3,
             },
+            */
           });
         }
         setLocating(false);
