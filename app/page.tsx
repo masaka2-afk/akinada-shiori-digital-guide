@@ -386,7 +386,7 @@ export default function Home() {
     if (!document.querySelector("script[data-akinada-map]")) {
       const script = document.createElement("script");
       script.dataset.akinadaMap = "true";
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(mapsApiKey)}&callback=__akinadaMapReady&v=weekly&language=ja&region=JP`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(mapsApiKey)}&loading=async&callback=__akinadaMapReady&v=weekly&language=ja&region=JP`;
       script.async = true;
       script.onerror = () => setMapStatus("error");
       document.head.appendChild(script);
