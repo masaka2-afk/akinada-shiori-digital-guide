@@ -319,7 +319,7 @@ export default function Home() {
 
     const renderMap = async () => {
       if (!mapNode.current || !window.google?.maps?.importLibrary) return;
-      const [{ Map: GoogleMap, LatLngBounds }, { Point, Size, SymbolPath }, markerLibrary] = await Promise.all([
+      const [{ Map: GoogleMap }, { LatLngBounds, Point, Size, SymbolPath }, markerLibrary] = await Promise.all([
         window.google.maps.importLibrary("maps"),
         window.google.maps.importLibrary("core"),
         window.google.maps.importLibrary("marker"),
