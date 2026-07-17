@@ -147,6 +147,18 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .detail-photo { height: 43%; min-height: 220px; position: relative; overflow: hidden; background: #c8ebef; }
 .detail-photo > img { width: 100%; height: 100%; object-fit: cover; }
 .detail-photo .photo-wash { position: absolute; inset: auto 0 0; height: 45%; background: linear-gradient(transparent, rgba(2,55,86,.34)); pointer-events: none; }
+.detail-card.video-playing { display: flex; flex-direction: column; }
+.detail-card.video-playing .detail-photo { width: 100%; height: auto; min-height: 0; aspect-ratio: 16 / 9; flex: 0 0 auto; }
+.detail-photo-playing .photo-wash { display: none; }
+.detail-video-player { display: block; width: 100%; height: 100%; border: 0; background: #032f49; }
+.video-monitor-trigger { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; min-width: 188px; padding: 10px 16px 10px 11px; border: 1px solid rgba(255,255,255,.46); border-radius: 999px; color: white; background: rgba(3,47,73,.84); box-shadow: 0 8px 22px rgba(3,47,73,.3); cursor: pointer; text-align: left; }
+.video-monitor-trigger:hover { background: rgba(3,47,73,.94); }
+.video-play-icon { width: 32px; height: 32px; flex: 0 0 auto; display: grid; place-items: center; padding-left: 2px; border-radius: 50%; color: var(--deep-blue); background: white; font-size: 13px; }
+.video-play-label { display: grid; gap: 1px; line-height: 1.2; }
+.video-play-label strong { font-size: 12px; }
+.video-play-label small { color: rgba(255,255,255,.78); font-size: 9px; }
+.video-close { position: absolute; z-index: 3; top: 10px; right: 10px; width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.72); border-radius: 50%; color: white; background: rgba(3,47,73,.78); font-size: 24px; line-height: 1; cursor: pointer; }
+.video-close:hover { background: rgba(3,47,73,.96); }
 .category-badge { position: absolute; top: 16px; left: 16px; padding: 7px 12px; border-radius: 999px; color: white; font-size: 11px; font-weight: 800; box-shadow: 0 5px 14px rgba(4,65,91,.18); }
 .category-badge.blue { background: #198fc2; }.category-badge.coral { background: var(--coral); }.category-badge.green { background: var(--green); }
 .detail-content { padding: 23px 25px 25px; }
@@ -220,6 +232,8 @@ footer a { margin-left: auto; color: white; border: 1px solid rgba(255,255,255,.
   .map-panel { height: 53vh; min-height: 410px; }
   .detail-card { margin: -14px 12px 0; border: 0; border-radius: 22px; box-shadow: var(--shadow); overflow: hidden; flex-direction: row; position: relative; z-index: 12; }
   .detail-photo { width: 36%; height: auto; min-height: 210px; flex: 0 0 auto; }
+  .detail-card.video-playing { flex-direction: column; }
+  .detail-card.video-playing .detail-photo { width: 100%; min-height: 0; aspect-ratio: 16 / 9; }
   .detail-content { padding: 18px; }
   .detail-content h2 { font-size: 24px; }
   .description { margin: 9px 0 13px; line-height: 1.65; }
@@ -241,6 +255,12 @@ footer a { margin-left: auto; color: white; border: 1px solid rgba(255,255,255,.
   .preview-note { bottom: 15px; left: 13px; translate: 0; max-width: calc(100% - 125px); overflow: hidden; text-overflow: ellipsis; }
   .detail-card { display: grid; grid-template-columns: 116px 1fr; margin-inline: 10px; }
   .detail-photo { width: 116px; min-height: 230px; }
+  .detail-card.video-playing { display: flex; }
+  .detail-card.video-playing .detail-photo { width: 100%; min-height: 0; aspect-ratio: 16 / 9; }
+  .video-monitor-trigger { left: auto; right: 8px; bottom: 8px; width: 42px; min-width: 42px; height: 42px; padding: 0; transform: none; justify-content: center; border-radius: 50%; }
+  .video-play-icon { width: 100%; height: 100%; font-size: 15px; }
+  .video-play-label { display: none; }
+  .video-close { top: 8px; right: 8px; width: 31px; height: 31px; font-size: 21px; }
   .detail-content { padding: 15px 14px 16px; min-width: 0; }
   .island-label { font-size: 8px; }
   .detail-content h2 { font-size: 21px; }

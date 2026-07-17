@@ -197,6 +197,38 @@ const miniApps: { id: MiniAppId; name: string; description: string; icon: string
   { id: "marble-catch", name: "しおりのビー玉キャッチ", description: "ビー玉を集めて遊ぼう", icon: "●", url: "https://akinada-shiori-game.netlify.app" },
 ];
 
+type YouTubeVideo = {
+  id: string;
+  embedUrl: string;
+};
+
+function getYouTubeVideo(value?: string): YouTubeVideo | null {
+  if (!value) return null;
+  try {
+    const normalized = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+    const url = new URL(normalized);
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    const isYouTubeHost = host === "youtube.com" || host === "m.youtube.com" || host === "youtu.be";
+    if (!isYouTubeHost) return null;
+
+    let videoId = "";
+    if (host === "youtu.be") {
+      videoId = url.pathname.split("/").filter(Boolean)[0] ?? "";
+    } else if (url.pathname === "/watch") {
+      videoId = url.searchParams.get("v") ?? "";
+    } else {
+      const [, type, id] = url.pathname.split("/");
+      if (["shorts", "embed", "live"].includes(type ?? "")) videoId = id ?? "";
+    }
+
+    if (!/^[A-Za-z0-9_-]{6,20}$/.test(videoId)) return null;
+    const params = new URLSearchParams({ autoplay: "1", playsinline: "1", rel: "0" });
+    return { id: videoId, embedUrl: `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?${params.toString()}` };
+  } catch {
+    return null;
+  }
+}
+
 function memoGroup(category: Place["category"]) {
   if (category === "歴史" || category === "神社") return "歴史・神社" as const;
   return category;
@@ -227,6 +259,7 @@ export default function Home() {
   const [memoText, setMemoText] = useState(shioriMemos.common[0]);
   const [syncMeta, setSyncMeta] = useState<SyncMeta>({});
   const [syncing, setSyncing] = useState(false);
+  const [playingVideo, setPlayingVideo] = useState<YouTubeVideo | null>(null);
   const mapNode = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const mapsLibraryRef = useRef<any>(null);
@@ -303,6 +336,7 @@ export default function Home() {
 
   const selectPlace = (place: Place, moveMap = true) => {
     setSelected(place);
+    setPlayingVideo(null);
     setMemoText((previous) => pickMemo(place.category, previous));
     if (moveMap) {
       mapRef.current?.panTo({ lat: place.lat, lng: place.lng });
@@ -313,6 +347,8 @@ export default function Home() {
   useEffect(() => {
     setMemoText((previous) => pickMemo(selected.category, previous));
   }, [selected.id, selected.category]);
+
+  const selectedVideo = useMemo(() => getYouTubeVideo(selected.youtube), [selected.youtube]);
 
   useEffect(() => {
     if (!mapsApiKey || !mapNode.current) return;
@@ -694,9 +730,35 @@ export default function Home() {
           <div className="map-legend"><span className="dot blue" />絶景・文化 <span className="dot coral" />歴史・神社 <span className="dot green" />グルメ・公園</div>
         </div>
 
-        <aside className="detail-card" aria-live="polite">
-          <div className="detail-photo">
-            <img src={selected.image || assetPath("shiori-guide.png")} alt={selected.name} />
+        <aside className={`detail-card${playingVideo ? " video-playing" : ""}`} aria-live="polite">
+          <div className={`detail-photo${playingVideo ? " detail-photo-playing" : ""}`}>
+            {playingVideo ? (
+              <>
+                <iframe
+                  className="detail-video-player"
+                  src={playingVideo.embedUrl}
+                  title={`${selected.name}の動画`}
+                  allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                  allowFullScreen
+                />
+                <button className="video-close" type="button" onClick={() => setPlayingVideo(null)} aria-label="動画を閉じる">×</button>
+              </>
+            ) : (
+              <>
+                <img src={selected.image || assetPath("shiori-guide.png")} alt={selected.name} />
+                {selectedVideo && (
+                  <button
+                    className="video-monitor-trigger"
+                    type="button"
+                    onClick={() => setPlayingVideo(selectedVideo)}
+                    aria-label={`${selected.name}をモニターで動画再生`}
+                  >
+                    <span className="video-play-icon" aria-hidden="true">▶</span>
+                    <span className="video-play-label"><strong>ここで再生</strong><small>モニターで動画を見る</small></span>
+                  </button>
+                )}
+              </>
+            )}
             <span className={`category-badge ${markerTone[selected.category]}`}>{selected.category}</span>
             <div className="photo-wash" />
           </div>
@@ -706,7 +768,7 @@ export default function Home() {
             <p className="description">{selected.description || "しおりちゃんと一緒に、島の景色と物語を見つけに行きましょう。"}</p>
             <div className="detail-actions">
               <a className="primary-action" href={navUrl} target="_blank" rel="noreferrer"><span>➤</span>ここへ行く</a>
-              {selected.youtube && <a className="video-action" href={selected.youtube} target="_blank" rel="noreferrer"><span>▶</span>動画を見る</a>}
+              {selectedVideo && <a className="video-action" href={selected.youtube} target="_blank" rel="noreferrer"><span>↗</span>YouTubeで見る</a>}
             </div>
             <div className="mini-guide">
               <img src={assetPath("shiori-icon.png")} alt="しおりちゃん" />
