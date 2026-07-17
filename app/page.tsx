@@ -190,11 +190,12 @@ const myMapsInspiredStyle = [
 
 type MapStatus = "loading" | "missing" | "ready" | "error";
 
-type MiniAppId = "calculator" | "marble-catch";
+type MiniAppId = "calculator" | "marble-catch" | "music-room";
 
-const miniApps: { id: MiniAppId; name: string; description: string; icon: string; url: string }[] = [
+const miniApps: { id: MiniAppId; name: string; description: string; icon: string; url: string; openMode?: "modal" | "new-tab" }[] = [
   { id: "calculator", name: "しおり電卓", description: "旅費やお買い物の計算に", icon: "▦", url: "https://masaka2-afk.github.io/chibi-shiori-calculator/" },
   { id: "marble-catch", name: "しおりのビー玉キャッチ", description: "ビー玉を集めて遊ぼう", icon: "●", url: "https://akinada-shiori-game.netlify.app" },
+  { id: "music-room", name: "しおりちゃんの音楽室", description: "島の景色と一緒に、しおりちゃんの音楽を楽しもう♪", icon: "🎧", url: "https://masaka2-afk.github.io/shiori-music-player/", openMode: "new-tab" },
 ];
 
 type YouTubeVideo = {
@@ -544,7 +545,12 @@ export default function Home() {
   }, [selected.id]);
 
   const openMiniApp = (appId: MiniAppId) => {
+    const app = miniApps.find((item) => item.id === appId);
     setAppsMenuOpen(false);
+    if (app?.openMode === "new-tab") {
+      window.open(app.url, "_blank", "noopener,noreferrer");
+      return;
+    }
     setAppLoaded(false);
     setAppSlow(false);
     setActiveAppId(appId);
