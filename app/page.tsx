@@ -190,11 +190,12 @@ const myMapsInspiredStyle = [
 
 type MapStatus = "loading" | "missing" | "ready" | "error";
 
-type MiniAppId = "calculator" | "marble-catch" | "music-room" | "culture-archive";
+type MiniAppId = "calculator" | "marble-catch" | "music-room" | "culture-archive" | "marble-chain";
 
 const miniApps: { id: MiniAppId; name: string; description: string; icon: string; url: string; openMode?: "modal" | "new-tab" }[] = [
   { id: "calculator", name: "しおり電卓", description: "旅費やお買い物の計算に", icon: "▦", url: "https://masaka2-afk.github.io/chibi-shiori-calculator/" },
   { id: "marble-catch", name: "しおりのビー玉キャッチ", description: "ビー玉を集めて遊ぼう", icon: "●", url: "https://akinada-shiori-game.netlify.app" },
+  { id: "marble-chain", name: "しおりのビー玉れんさ", description: "ひとりで・ちびしおり・ちょむちょむと対戦", icon: "✦", url: "https://shiori-marble-chain.masaka2sand-ocn-ne-jp.chatgpt.site" },
   { id: "music-room", name: "しおりちゃんの音楽室", description: "島の景色と一緒に、しおりちゃんの音楽を楽しもう♪", icon: "🎧", url: "https://masaka2-afk.github.io/shiori-music-player/", openMode: "new-tab" },
   { id: "culture-archive", name: "安芸灘しおり文化アーカイブ", description: "島の歴史・文化・資料を未来へ残すデジタルアーカイブ", icon: "▤", url: "https://akinada-shiori-culture-archive.masaka2sand-ocn-ne-jp.chatgpt.site/v2", openMode: "new-tab" },
 ];
@@ -821,7 +822,7 @@ export default function Home() {
         <div className="mini-app-backdrop" role="presentation" onMouseDown={(event) => {
           if (event.target === event.currentTarget) setActiveAppId(null);
         }}>
-          <section className={`mini-app-modal ${activeApp.id}`} role="dialog" aria-modal="true" aria-labelledby="mini-app-title">
+          <section className={`mini-app-modal ${activeApp.id === "marble-chain" ? "marble-catch" : activeApp.id}`} role="dialog" aria-modal="true" aria-labelledby="mini-app-title">
             <div className="mini-app-head">
               <div><small>SHIORI APPS</small><h2 id="mini-app-title">{activeApp.name}</h2></div>
               <button onClick={() => setActiveAppId(null)} aria-label={`${activeApp.name}を閉じる`}>×</button>
@@ -832,6 +833,7 @@ export default function Home() {
                 src={activeApp.url}
                 title={activeApp.name}
                 loading="eager"
+                allow={activeApp.id === "marble-chain" ? "autoplay" : undefined}
                 referrerPolicy="strict-origin-when-cross-origin"
                 onLoad={() => { setAppLoaded(true); setAppSlow(false); }}
               />
