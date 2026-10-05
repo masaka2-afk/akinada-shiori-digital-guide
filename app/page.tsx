@@ -517,7 +517,7 @@ export default function Home() {
       const size = active ? 62 : 48;
       if (markerModeRef.current === "legacy") {
         marker.setIcon({
-          url: markerAsset[marker.__category as Exclude<Category, "縺吶∋縺ｦ">],
+          url: markerAsset[marker.__category as Exclude<Category, "すべて">],
           scaledSize: new mapsLibrary.Size(size, size),
           anchor: new mapsLibrary.Point(size / 2, size / 2),
         });
@@ -591,7 +591,7 @@ export default function Home() {
             new GoogleMarker({
               position: current,
               map: mapRef.current,
-              title: "迴ｾ蝨ｨ蝨ｰ",
+              title: "現在地",
               icon: {
                 path: mapsLibraryRef.current.SymbolPath.CIRCLE,
                 scale: 8,
